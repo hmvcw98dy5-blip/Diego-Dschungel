@@ -2,7 +2,7 @@
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#143d32;font-family:system-ui,Arial,sans-serif;touch-action:none}canvas{display:block;width:100vw;height:100dvh}button{font:inherit;touch-action:none;cursor:pointer}.top{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;right:10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;pointer-events:none}.mission{background:#fff8d8;border:3px solid #ad7837;border-radius:16px;padding:8px 12px;color:#285238;font-size:clamp(12px,1.7vw,17px);font-weight:800;max-width:min(52vw,440px);box-shadow:0 3px #855421;pointer-events:auto}.menu{display:flex;gap:6px;pointer-events:auto}.menu button,.action{border:3px solid white;border-radius:17px;background:#ffbe46;color:#244b36;font-weight:900;font-size:clamp(16px,2.2vw,22px);padding:8px 12px;box-shadow:0 4px #a56b20}.controls{position:fixed;left:15px;bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:12px}.controls button,.jump{width:clamp(66px,10vw,86px);height:clamp(66px,10vw,86px);border:4px solid white;border-radius:50%;background:#1685c9;color:white;font-size:35px;font-weight:900;box-shadow:0 5px #16537a;user-select:none;-webkit-user-select:none}.jump{position:fixed;right:17px;bottom:max(12px,env(safe-area-inset-bottom));background:#43aa37;box-shadow:0 5px #267026}.controls button:active,.jump:active{filter:brightness(1.2);transform:translateY(3px)}.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#fff6d8;border:3px solid #b67d36;border-radius:15px;padding:8px 13px;color:#245239;font-weight:800;text-align:center;max-width:43vw;pointer-events:none;font-size:clamp(12px,1.6vw,16px)}.overlay{position:fixed;inset:0;background:#062b23bb;display:flex;align-items:center;justify-content:center;padding:12px;z-index:5}.hidden{display:none!important}.panel{background:#fff9df;border:5px solid #e6a545;border-radius:25px;box-shadow:0 8px #875a29;padding:18px;max-width:660px;width:100%;max-height:92dvh;overflow:auto;text-align:center;color:#255039}.panel h1{font-size:clamp(22px,3.5vw,34px);margin:0 0 10px}.panel p{font-size:clamp(16px,2vw,20px);margin:9px 0}.choices{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:15px 0}.choices button{background:white;border:3px solid #c99347;border-radius:17px;min-width:130px;min-height:83px;color:#285039;font-size:18px;font-weight:800;padding:8px}.choices button:active{background:#d6f6ce}.hint{font-size:14px!important;color:#58705c}.progress{font-weight:800;color:#3a7544}.action{background:#4cbb51;color:white;padding:12px 18px;margin:7px}.secondary{background:#fff;color:#285039;border-color:#c99347}.spark{animation:pulse 1.2s infinite}@keyframes pulse{50%{transform:scale(1.06)}}@media(max-width:650px){.mission{max-width:47vw}.menu button{padding:7px;font-size:15px}.toast{bottom:90px;max-width:52vw;font-size:12px}.panel{padding:10px}.choices button{min-width:110px;min-height:67px}}
 </style></head><body><canvas id="game"></canvas><div class="top"><div class="mission" id="mission">🐾 Mission: Rette das Jaguarbaby!</div><div class="menu"><button id="sound" aria-label="Ton">🔇</button><button id="bag" aria-label="Rucksack">🎒 <span id="count">0</span></button><button id="help" aria-label="Hilfe">❔</button></div></div><div class="controls"><button id="left" aria-label="Links laufen">◀</button><button id="right" aria-label="Rechts laufen">▶</button></div><button class="jump" id="jump" aria-label="Springen">⬆</button><div class="toast" id="toast">Tippe auf ▶ und erkunde den neuen Cartoon-Dschungel!</div><div class="overlay" id="overlay"><div class="panel" id="panel"></div></div><script>
 'use strict';
-const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');const scenery=new Image();scenery.src='assets/rainforest-panorama.webp';
+const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');const scenery=new Image();scenery.src='assets/rainforest-clean.svg';
 const leafAsset=new Image();leafAsset.src='assets/foreground-leaves.png';
 let W=960,H=540,scale=1,ox=0,oy=0,cam=0,last=0,paused=true,phase='intro',hintLevel=0,solved=false,sound=false,actx=null,toastUntil=0;const WORLD=2920,GROUND=422,hero={x:90,y:GROUND-76,vy:0,on:true,face:1},keys={left:false,right:false,jump:false};const items=[{id:'rope',x:485,name:'Seil',icon:'🪢'},{id:'plank',x:930,name:'Holzbrett',icon:'🪵'},{id:'logs',x:1470,name:'Baumstämme',icon:'🪵'}];let inv=new Set(),cutscene=null,bridgeBuilt=false,raftBuilt=false,companionX=35,companionY=GROUND-2,collectFX=null,route='',crossProgress=0;let fireflies=Array.from({length:28},(_,i)=>({x:60+i*107,y:115+(i*47)%220}));
 function resize(){let d=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*d);canvas.height=Math.round(innerHeight*d);scale=Math.min(canvas.width/W,canvas.height/H);ox=(canvas.width-W*scale)/2;oy=(canvas.height-H*scale)/2}addEventListener('resize',resize);resize();
@@ -117,24 +117,21 @@ function jungleSky(t){
  if(scenery.complete&&scenery.naturalWidth){
    // Langsamere Parallax-Bewegung: die entfernten Berge folgen der Kamera kaum.
    const px=-(cam*.16)%1450;
-   ctx.save();ctx.globalAlpha=.96;
-   for(let x=px-1450;x<W+1450;x+=1450)ctx.drawImage(scenery,x,58,1450,370);
+   ctx.save();ctx.globalAlpha=1;
+   for(let x=px-1450;x<W+1450;x+=1450)ctx.drawImage(scenery,x,0,1450,H);
    ctx.restore();
  }else{
    ctx.fillStyle='#86c7bb';for(let i=0;i<8;i++){ctx.beginPath();ctx.moveTo(i*200-100,370);ctx.lineTo(i*200+80,170);ctx.lineTo(i*200+270,370);ctx.fill()}
  }
- // Separater Mittelgrund mit Bäumen, der schneller scrollt als die Berge.
- ctx.save();ctx.translate(-cam*.45,0);
- for(let i=-2;i<26;i++){
-   let x=i*182+35,top=105+(i*43)%70;
-   ctx.strokeStyle='#5e5035';ctx.lineWidth=20;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,440);ctx.bezierCurveTo(x-35,310,x+35,220,x+4,top);ctx.stroke();
-   for(let j=0;j<7;j++){let a=j*Math.PI*2/7;leaf(x+Math.cos(a)*51,top+Math.sin(a)*30,57,34,j%2?'#1b834e':'#239b59',a*.25)}
-   leaf(x,top,63,39,'#36ad60');
-   if(i%2===0){ctx.strokeStyle='#327c41';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x+55,top+10);ctx.bezierCurveTo(x+32,top+85,x+100,top+90,x+80,top+160+Math.sin(t*.001+i)*5);ctx.stroke()}
- }
+ // Die alte schematische Baumebene ist bewusst entfernt.
+
+}
+function foregroundFoliage(t){
+ // Nur dezente Bodengräser, damit die Spielfiguren sichtbar bleiben.
+ ctx.save();ctx.translate(-cam*.98,0);
+ for(let i=-1;i<85;i++){let x=i*43+15,y=GROUND+9;leaf(x,y-5,7,18,i%2?'#287e42':'#3f9b4e',-.25);leaf(x+9,y-4,6,15,'#4aaf55',.35)}
  ctx.restore();
 }
-function foregroundFoliage(t){if(leafAsset.complete&&leafAsset.naturalWidth){ctx.save();ctx.globalAlpha=.72;let x=-(cam*.92)%900;for(let xx=x-900;xx<W+900;xx+=900)ctx.drawImage(leafAsset,xx,GROUND-80,900,220);ctx.restore()}ctx.save();ctx.translate(-cam*.98,0);for(let i=-1;i<34;i++){let x=i*113+20,y=GROUND+18;for(let j=0;j<5;j++){let a=(-2.7+j*.54)+Math.sin(t*.001+i)*.025;leaf(x+Math.cos(a)*24,y+Math.sin(a)*30,15,38,j%2?'#237d45':'#329d4d',a+Math.PI/2)}if(i%3===0){ctx.fillStyle='#ed635b';for(let j=0;j<5;j++){let a=j*1.256;leaf(x+Math.cos(a)*12,y-28+Math.sin(a)*12,7,12,'#f26b6d',a)}leaf(x,y-28,5,5,'#ffd455')}}ctx.restore()}
 
 function draw(t){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#83d6de';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.setTransform(scale,0,0,scale,ox,oy);jungleSky(t);
 ctx.save();ctx.translate(-cam,0);
